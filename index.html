@@ -24,6 +24,11 @@
         return CryptoJS.SHA256(CryptoJS.enc.Hex.parse(a)).toString()
     }
 
+    function RIPEMD160HexToByteArray(a)
+    {
+        return CryptoJS.RIPEMD160(CryptoJS.enc.Hex.parse(a)).toString()
+    }
+
     function BytesToHex(byteArray) {
         return Array.from(byteArray, function(byte) 
         {
@@ -133,6 +138,30 @@ function Base58DecodeToHex(
         return bitcoinPrivateKey;
     }
 
+    function _HashPrivateKey(privateKey)
+    {
+        let formattedHex = _GetHexFromPrivateKey(privateKey);
+
+        let point = Point.fromPrivateKey(formattedHex);
+        let xHex = BnToHex(point.x);
+        let yHex = BnToHex(point.y);
+
+        let concat = "04"+xHex+yHex;
+        let sha256Result = SHA256HexToByteArray(concat);
+        let ripemd160Result = RIPEMD160HexToByteArray(sha256Result)
+        return ripemd160Result
+    }
+
+    function StringToHex(str)
+    {
+        var result = '';
+        for (var i=0; i<str.length; i++) {
+        result += str.charCodeAt(i).toString(16);
+        }
+        return result;
+    }
+    
+
     function BnToHex(bn) {
         var base = 16;
         var hex = BigInt(bn).toString(base);
@@ -185,24 +214,43 @@ function Base58DecodeToHex(
         return BigInt('0x'+formattedHex)
     }
 
-    function ConvertCompressedToRegularWif(compressedKey)
+    function DecompressWIF(compressedKey)
     {
+        if (compressedKey.startsWith('5'))
+            return compressedKey
+
         let formattedHex = _GetHexFromPrivateKey(compressedKey);
-        let k = "80" + formattedHex
-        return _PrivateKeyAndVersionToBitcoinKey(k)
+        let k = "80" + formattedHex;
+        return _PrivateKeyAndVersionToBitcoinKey(k);
     }
 
     function PrivateKeyToLegacyAddress(key)
     {
-        let formattedHex = _GetHexFromPrivateKey(key)
-        console.log(formattedHex)
-        console.log(Point.fromPrivateKey(formattedHex))
+        let hashResult = _HashPrivateKey(key)
+        
+        let publicKeyWithVersion = "00" + hashResult;
+
+        let checksum = SHA256HexToByteArray(SHA256HexToByteArray(publicKeyWithVersion)).substr(0,8)
+
+        let publicKeyWithChecksum = publicKeyWithVersion + checksum
+        console.log(Base58Encode(publicKeyWithChecksum))
+    }
+
+    function PrivateKeyToSegwitAddress(key)
+    {
+        let keyhash = _HashPrivateKey(key);
+
+    }
+
+    function PrivateKeyToBech32Address(key)
+    {
+        let hashResult = _HashPrivateKey(key)
     }
 </script>
 
 <script>
-    console.log(ConvertCompressedToRegularWif('L5oLkpV3aqBjhki6LmvChTCV6odsp4SXM6FfU2Gppt5kFLaHLuZ9'))
+    let privateKey = GenerateRandomPrivateKey();
 
-    //console.log(PrivateKeyToLegacyAddress('5Km2kuu7vtFDPpxywn4u3NLpbr5jKpTB3jsuDU2KYEqetqj84qw'))
-    //console.log(_GetHexFromPrivateKey('5Km2kuu7vtFDPpxywn4u3NLpbr5jKpTB3jsuDU2KYEqetqj84qw'))
+    console.log(privateKey);
+    console.log(PrivateKeyToSegwitAddress(privateKey))
 </script>
