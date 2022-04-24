@@ -168,6 +168,14 @@ function Base58DecodeToHex(
         return _PrivateKeyAndVersionToBitcoinKey(privateKeyAndVersion);
     }
 
+    function GenerateRandomCompressedPrivateKey()
+    {
+        let randomKey = GenerateRandomPrivateKey();
+        let compressed = CompressWIF(randomKey)
+        
+        return compressed
+    }
+
     function GeneratePrivateKeyFromNumber(numStr)
     {
         let num = BigInt(numStr)
@@ -216,7 +224,7 @@ function Base58DecodeToHex(
         return _PrivateKeyAndVersionToBitcoinKey(k)
     }
 
-    function PrivateKeyToLegacyAddress(key)
+    function PrivateKeyToLegacyAddress(privateKey)
     {
         let formattedHex = _GetHexFromPrivateKey(privateKey);
 
@@ -237,11 +245,65 @@ function Base58DecodeToHex(
     }
 
     function CompressedPrivateKeyToLegacyAddress(key)
-
-    function PrivateKeyToSegwitAddress(key)
     {
-        let keyhash = _HashPrivateKey(key);
+        let formattedHex = _GetHexFromPrivateKey(key)
+        formattedHex = formattedHex.substr(0, formattedHex.length - 2)
+        
+        console.log(formattedHex)
 
+        let point = Point.fromPrivateKey(formattedHex);
+        let xHex = BnToHex(point.x);
+        let yHex = BnToHex(point.y);
+
+        if (point.y % BigInt('2') == BigInt('0'))
+        {
+            xHex = "02" + xHex;
+        }
+        else
+        {
+            xHex = "03" + xHex
+        }
+
+        let sha256Result = SHA256HexToByteArray(xHex);
+        let ripemd160Result = RIPEMD160HexToByteArray(sha256Result);
+
+        let publicKeyWithVersion = "00" + ripemd160Result;
+
+        let checksum = SHA256HexToByteArray(SHA256HexToByteArray(publicKeyWithVersion)).substr(0,8)
+    
+        let publicKeyWithChecksum = publicKeyWithVersion + checksum;
+
+        return (Base58Encode(publicKeyWithChecksum));
+    }
+
+    function CompressedPrivateKeyToSegwitAddress(key)
+    {
+        let formattedHex = _GetHexFromPrivateKey(key.substr(0, key.length-2));
+
+        let point = Point.fromPrivateKey(formattedHex);
+        let xHex = BnToHex(point.x);
+        let yHex = BnToHex(point.y);
+
+        if (point.y % BigInt('2') == BigInt('0'))
+        {
+            xHex = "02" + xHex;
+        }
+        else
+        {
+            xHex = "03" + xHex
+        }
+
+        let sha256Result = SHA256HexToByteArray(xHex);
+        let scriptHash = RIPEMD160HexToByteArray(sha256Result);
+
+        let p2sh_p2wpkh_v0 = HexToBytes("a9"+scriptHash+'87')
+        let flaggedScriptHash = HexToBytes("06"+scriptHash)
+
+        let checksum = SHA256HexToByteArray(SHA256HexToByteArray(BytesToHex(flaggedScriptHash))).substr(0,8)
+
+        let binAddr = BytesToHex(flaggedScriptHash) + checksum
+        
+        console.log(Base58Encode(binAddr))
     }
 
     function PrivateKeyToBech32Address(key)
@@ -251,10 +313,11 @@ function Base58DecodeToHex(
 </script>
 
 <script>
-    let privateKey = GeneratePrivateKeyFromNumber(BigInt('1'))
-    let compr = GenerateCompressedPrivateKeyFromNumber(BigInt('1'));
-
-    //console.log(privateKey);
-    //console.log(compr);
-    console.log(PrivateKeyToLegacyAddress(privateKey))
+    let compr = 'KzMVzFdD4UDzRiXpGUtmM9HDh8RefUR4ZrQk53Qh6USTs7kDxxFS'
+    console.log(compr)
+    let decomp = DecompressWIF(compr)
+    let legacy = PrivateKeyToLegacyAddress(decomp)
+    let legacyc = CompressedPrivateKeyToLegacyAddress(compr)
+    console.log(legacyc)
+    console.log(legacy)
 </script>
