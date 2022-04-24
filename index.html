@@ -248,8 +248,6 @@ function Base58DecodeToHex(
     {
         let formattedHex = _GetHexFromPrivateKey(key)
         formattedHex = formattedHex.substr(0, formattedHex.length - 2)
-        
-        console.log(formattedHex)
 
         let point = Point.fromPrivateKey(formattedHex);
         let xHex = BnToHex(point.x);
@@ -278,7 +276,8 @@ function Base58DecodeToHex(
 
     function CompressedPrivateKeyToSegwitAddress(key)
     {
-        let formattedHex = _GetHexFromPrivateKey(key.substr(0, key.length-2));
+        let formattedHex = _GetHexFromPrivateKey(key)
+        formattedHex = formattedHex.substr(0, formattedHex.length - 2)
 
         let point = Point.fromPrivateKey(formattedHex);
         let xHex = BnToHex(point.x);
@@ -294,16 +293,20 @@ function Base58DecodeToHex(
         }
 
         let sha256Result = SHA256HexToByteArray(xHex);
-        let scriptHash = RIPEMD160HexToByteArray(sha256Result);
+        let keyHash = RIPEMD160HexToByteArray(sha256Result);
 
-        let p2sh_p2wpkh_v0 = HexToBytes("a9"+scriptHash+'87')
-        let flaggedScriptHash = HexToBytes("06"+scriptHash)
+        let p2w_v0 = HexToBytes("0014"+keyHash);
 
-        let checksum = SHA256HexToByteArray(SHA256HexToByteArray(BytesToHex(flaggedScriptHash))).substr(0,8)
+        let scriptHash = RIPEMD160HexToByteArray(SHA256HexToByteArray(BytesToHex(p2w_v0)))
 
-        let binAddr = BytesToHex(flaggedScriptHash) + checksum
-        
-        console.log(Base58Encode(binAddr))
+        let p2sh = HexToBytes("a9"+ scriptHash + '87')
+        let flaggedScripthash = HexToBytes("05"+scriptHash);
+
+        let checksum = SHA256HexToByteArray(SHA256HexToByteArray(BytesToHex(flaggedScripthash))).substr(0,8)
+
+        let binAddr = BytesToHex(flaggedScripthash)+checksum;
+
+        return Base58Encode(binAddr)
     }
 
     function PrivateKeyToBech32Address(key)
@@ -314,10 +317,16 @@ function Base58DecodeToHex(
 
 <script>
     let compr = 'KzMVzFdD4UDzRiXpGUtmM9HDh8RefUR4ZrQk53Qh6USTs7kDxxFS'
-    console.log(compr)
     let decomp = DecompressWIF(compr)
-    let legacy = PrivateKeyToLegacyAddress(decomp)
-    let legacyc = CompressedPrivateKeyToLegacyAddress(compr)
-    console.log(legacyc)
+    console.log(compr)
+    
+    let legacy = CompressedPrivateKeyToLegacyAddress(compr)
     console.log(legacy)
+
+    let legacyD = PrivateKeyToLegacyAddress(decomp)
+    console.log(legacyD)
+
+    let segwit = CompressedPrivateKeyToSegwitAddress(compr)
+    console.log(segwit)
+
 </script>
