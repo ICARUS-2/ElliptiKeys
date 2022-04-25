@@ -94,6 +94,59 @@ function Base58DecodeToHex(
         b.push( d[j] );      //append each byte to the result
     return BytesToHex(new Uint8Array(b))
 }
+    function FourBitHexToBinary(hex){
+        let s =  ("" + (parseInt(hex, 16)).toString(2)).substr(-8);
+
+        while (s.length != 4)
+        {
+            s = "0" + s
+        }
+        return s;
+    }
+
+    function BinaryToHex(s) {
+    var i, k, part, accum, ret = '';
+    for (i = s.length-1; i >= 3; i -= 4) {
+        // extract out in substrings of 4 and convert to hex
+        part = s.substr(i+1-4, 4);
+        accum = 0;
+        for (k = 0; k < 4; k += 1) {
+            if (part[k] !== '0' && part[k] !== '1') {
+                // invalid character
+                return { valid: false };
+            }
+            // compute the length 4 substring
+            accum = accum * 2 + parseInt(part[k], 10);
+        }
+        if (accum >= 10) {
+            // 'A' to 'F'
+            ret = String.fromCharCode(accum - 10 + 'A'.charCodeAt(0)) + ret;
+        } else {
+            // '0' to '9'
+            ret = String(accum) + ret;
+        }
+    }
+    // remaining characters, i = 0, 1, or 2
+    if (i >= 0) {
+        accum = 0;
+        // convert from front
+        for (k = 0; k <= i; k += 1) {
+            if (s[k] !== '0' && s[k] !== '1') {
+                return { valid: false };
+            }
+            accum = accum * 2 + parseInt(s[k], 10);
+        }
+        // 3 bits, value cannot exceed 2^3 - 1 = 7, just convert
+        ret = String(accum) + ret;
+    }
+    return { valid: true, result: ret };
+}
+
+    function BinaryToDecimal(bin)
+    {
+        return parseInt(bin, 2)
+    }
+
     function _GetHexFromPrivateKey(key)
     {
         let decoded = Base58DecodeToHex(key)
@@ -102,6 +155,12 @@ function Base58DecodeToHex(
 
         let formattedHex = _FormatHexStringLength(hexWithoutPrefix)
         return formattedHex;
+    }
+
+    function _MapBech32Char(byte)
+    {
+        const chars = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
+        return chars[byte];
     }
 
     function _FormatHexStringLength(s)
@@ -133,15 +192,44 @@ function Base58DecodeToHex(
         return bitcoinPrivateKey;
     }
 
-    function StringToHex(str)
-    {
-        var result = '';
-        for (var i=0; i<str.length; i++) {
-        result += str.charCodeAt(i).toString(16);
-        }
-        return result;
+    //kimbatt bitcoin generator bech32 library
+    function Bech32HrpExpand(hrp) {
+        var ret = [];
+        for (var i = 0; i < hrp.length; ++i)
+            ret.push(hrp.charCodeAt(i) >> 5);
+        ret.push(0);
+        for (var i = 0; i < hrp.length; ++i)
+            ret.push(hrp.charCodeAt(i) & 0x1f);
+        return ret;
     }
-    
+    function Bech32Polymod(values) {
+      var GEN = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3];
+        var chk = 1;
+        for (var i = 0; i < values.length; ++i) {
+            var b = chk >> 25;
+            chk = ((chk & 0x1ffffff) << 5) ^ values[i];
+            for (var j = 0; j < 5; ++j) {
+                if ((b >> j) & 1)
+                    chk ^= GEN[j];
+            }
+        }
+        return chk;
+    }
+    function Bech32CreateChecksum(hrp, data) {
+      var hrpExpanded = Bech32HrpExpand(hrp);
+        hrpExpanded.push.apply(hrpExpanded, data);
+        hrpExpanded.push.apply(hrpExpanded, [0, 0, 0, 0, 0, 0]);
+        var polymod = Bech32Polymod(hrpExpanded) ^ 1;
+        var ret = [];
+        for (var i = 0; i < 6; ++i)
+            ret.push((polymod >> 5 * (5 - i)) & 31);
+        return ret;
+    }
+
+    function HexToDecimal(hex)
+    {
+        return parseInt(hexString, 16);
+    }
 
     function BnToHex(bn) {
         var base = 16;
@@ -246,6 +334,9 @@ function Base58DecodeToHex(
 
     function CompressedPrivateKeyToLegacyAddress(key)
     {
+        if (!key.startsWith('K') && !key.startsWith('L'))
+            throw new Error("Only compressed keys are supported");
+
         let formattedHex = _GetHexFromPrivateKey(key)
         formattedHex = formattedHex.substr(0, formattedHex.length - 2)
 
@@ -276,6 +367,9 @@ function Base58DecodeToHex(
 
     function CompressedPrivateKeyToSegwitAddress(key)
     {
+        if (!key.startsWith('K') && !key.startsWith('L'))
+            throw new Error("Only compressed keys are supported");
+
         let formattedHex = _GetHexFromPrivateKey(key)
         formattedHex = formattedHex.substr(0, formattedHex.length - 2)
 
@@ -309,14 +403,88 @@ function Base58DecodeToHex(
         return Base58Encode(binAddr)
     }
 
-    function PrivateKeyToBech32Address(key)
+    function CompressedPrivateKeyToBech32Address(key)
     {
-        let hashResult = _HashPrivateKey(key)
+        if (!key.startsWith('K') && !key.startsWith('L'))
+            throw new Error("Only compressed keys are supported");
+
+        const bech32Chars = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
+
+        let formattedHex = _GetHexFromPrivateKey(key)
+        formattedHex = formattedHex.substr(0, formattedHex.length - 2)
+
+        let point = Point.fromPrivateKey(formattedHex);
+        let xHex = BnToHex(point.x);
+        let yHex = BnToHex(point.y);
+
+        if (point.y % BigInt('2') == BigInt('0'))
+        {
+            xHex = "02" + xHex;
+        }
+        else
+        {
+            xHex = "03" + xHex
+        }
+
+        let sha256Result = SHA256HexToByteArray(xHex);
+        let keyhash = RIPEMD160HexToByteArray(sha256Result);
+
+        let redeemScript = HexToBytes("0014"+keyhash);
+
+        //keyhash = "751e76e8199196d454941c45d1b3a323f1433bd6"
+        let toChar = Object.assign([], keyhash)
+        
+        let binArr = []
+
+        for (let c of toChar)
+        {
+            binArr.push(FourBitHexToBinary(c))
+        }
+
+        let fullBinStr = "";
+        for (let c of binArr)
+        {
+            fullBinStr += c
+        }
+
+        let squashedArr = [];
+        let tempStr = "";
+        for(let i = 0; i < fullBinStr.length; i++)
+        {
+            tempStr += fullBinStr[i];
+            if ((i+1) % 5 == 0)
+            {
+                squashedArr.push(tempStr)
+                tempStr=""
+            }
+        }
+
+        let formattedKey = "";
+        for(let c of squashedArr)
+        {
+            formattedKey +=BinaryToHex(c).result.toLowerCase()
+        }
+        formattedKey = "00" + formattedKey
+
+        let bytes = HexToBytes(formattedKey);
+
+        let checksum = BytesToHex(Bech32CreateChecksum("bc", bytes))
+
+        let finalKey = HexToBytes(formattedKey + checksum);
+        
+        let bech32Address = "bc1";
+        for(let c of finalKey)
+        {
+            bech32Address += _MapBech32Char(c);
+        }
+
+        return bech32Address
     }
 </script>
 
 <script>
-    let compr = 'KzMVzFdD4UDzRiXpGUtmM9HDh8RefUR4ZrQk53Qh6USTs7kDxxFS'
+    let compr = GenerateRandomCompressedPrivateKey();
+    //let compr = 'KzMVzFdD4UDzRiXpGUtmM9HDh8RefUR4ZrQk53Qh6USTs7kDxxFS'
     let decomp = DecompressWIF(compr)
     console.log(compr)
     
@@ -329,4 +497,6 @@ function Base58DecodeToHex(
     let segwit = CompressedPrivateKeyToSegwitAddress(compr)
     console.log(segwit)
 
+    let bech32 = CompressedPrivateKeyToBech32Address(compr);
+    console.log(bech32)
 </script>
