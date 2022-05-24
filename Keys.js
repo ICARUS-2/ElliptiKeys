@@ -479,9 +479,13 @@ static Base58DecodeToHex(
         return bech32Address
     }
 
-    static GenerateRandomBip39Seed(num=12)
+    static GenerateRandomBip39Seed(is256Bit = false)
     {
-        let arrLength = 16
+        let arrLength;
+        if (is256Bit)
+            arrLength = 32
+        else
+            arrLength = 16
 
         var randArr = new Uint8Array(arrLength) 
         window.crypto.getRandomValues(randArr)
@@ -511,7 +515,7 @@ static Base58DecodeToHex(
 
         let firstByte = Keys.CreateBinaryString(sha256Bytes[0]).split(" ")[3];
 
-        let checksum = firstByte.substr(0, firstByte.length-checksumLength)
+        let checksum = firstByte.substr(0, checksumLength)
         
         console.log(checksum)
 
