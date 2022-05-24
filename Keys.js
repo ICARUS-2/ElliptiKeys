@@ -495,7 +495,7 @@ static Base58DecodeToHex(
         return bech32Address
     }
 
-    static GenerateRandomBip39Seed(wordCount = 12)
+    static GenerateRandomBip39Mnemonic(wordCount = 12)
     {
         let arrLength;
 
@@ -533,7 +533,8 @@ static Base58DecodeToHex(
             privateKeyBytes[i] = randArr[i]
 
         //TEST CASE
-        privateKeyBytes = [204, 40, 66, 180, 148, 159, 102, 152, 155, 222, 4, 35, 24, 42, 224, 14]
+        //privateKeyBytes = [204, 40, 66, 180, 148, 159, 102, 152, 155, 222, 4, 35, 24, 42, 224, 14]
+        //slow dragon pudding circle wait era hunt scene cart scout retreat buffalo
         //
 
         console.log(privateKeyBytes)
@@ -546,8 +547,6 @@ static Base58DecodeToHex(
         }
 
         let checksum = Keys._ComputeBip39Checksum(privateKeyBytes)
-        
-        console.log(checksum)
 
         let fullBinStrWithChecksum = fullBinStr + checksum
 
@@ -574,7 +573,7 @@ static Base58DecodeToHex(
         return words
     }
 
-    static VerifyBip39Seed(words)
+    static VerifyBip39Mnemonic(words)
     {
         let bitCount;
 
@@ -652,5 +651,22 @@ static Base58DecodeToHex(
         let verifiedChecksum = Keys._ComputeBip39Checksum(privateKeyBytes)
         
         return verifiedChecksum == receivedChecksum
+    }
+
+    static GetSeedFromMnemonic(words)
+    {
+        let concat ="";
+
+        for(let i = 0; i < words.length; i++)
+        {
+            concat += words[i]
+
+            if (i != words.length - 1)
+                concat += " "
+        }
+        console.log(concat)
+        let seed = CryptoJS.PBKDF2(concat, "mnemonic", {keySize: 64, iterations: 2048, hasher: CryptoJS.algo.SHA512})
+
+        console.log(seed.toString())
     }
 }

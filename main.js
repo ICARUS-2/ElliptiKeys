@@ -17,8 +17,10 @@ console.log(segwit)
 let bech32 = Keys.CompressedPrivateKeyToBech32Address(compr);
 console.log(bech32)
 
-let seed = Keys.GenerateRandomBip39Seed(12)
-console.log(seed)
+let mnemonic = Keys.GenerateRandomBip39Mnemonic(12)
+console.log(mnemonic)
 
-let isValid = Keys.VerifyBip39Seed(seed);
+let isValid = Keys.VerifyBip39Mnemonic(mnemonic);
 console.log(isValid)
+
+Keys.GetSeedFromMnemonic(mnemonic)
