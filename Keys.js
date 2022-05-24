@@ -1,11 +1,14 @@
 import CryptoJS from "./crypto-js.js";
 import { Point } from "./noble-secp256k1.js";
+import BIP39_WORDS from "./bip39-en.js";
 
 export default class Keys
 {
     static HEX_LENGTH = 64;
     static MAX_PRIVATE_KEY = BigInt("115792089237316195423570985008687907852837564279074904382605163141518161494336")
     static BECH32_CHARS = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
+    static BITS_IN_BYTE = 8;
+    static LENGTH_MULTIPLE = 32;
 
     static SHA256HexToByteArray(a)
     {
@@ -82,10 +85,10 @@ static Base58DecodeToHex(
         b.push( d[j] );      //append each byte to the result
     return Keys.BytesToHex(new Uint8Array(b))
 }
-    static FourBitHexToBinary(hex){
+    static HexToBinaryString(hex, len){
         let s =  ("" + (parseInt(hex, 16)).toString(2)).substr(-8);
 
-        while (s.length != 4)
+        while (s.length != len)
         {
             s = "0" + s
         }
@@ -134,6 +137,20 @@ static Base58DecodeToHex(
     {
         return parseInt(bin, 2)
     }
+
+    //https://stackoverflow.com/questions/9939760/how-do-i-convert-an-integer-to-binary-in-javascript
+    static CreateBinaryString(nMask) {
+        // nMask must be between -2147483648 and 2147483647
+        if (nMask > 2**31-1) 
+           throw "number too large. number shouldn't be > 2**31-1"; //added
+        if (nMask < -1*(2**31))
+           throw "number too far negative, number shouldn't be < 2**31" //added
+        for (var nFlag = 0, nShifted = nMask, sMask = ''; nFlag < 32;
+             nFlag++, sMask += String(nShifted >>> 31), nShifted <<= 1);
+        sMask=sMask.replace(/\B(?=(.{8})+(?!.))/g, " ") // added
+        return sMask;
+      }
+      
 
     static _GetHexFromPrivateKey(key)
     {
@@ -419,7 +436,7 @@ static Base58DecodeToHex(
 
         for (let c of toChar)
         {
-            binArr.push(Keys.FourBitHexToBinary(c))
+            binArr.push(Keys.HexToBinaryString(c, 4))
         }
 
         let fullBinStr = "";
@@ -460,5 +477,66 @@ static Base58DecodeToHex(
         }
 
         return bech32Address
+    }
+
+    static GenerateRandomBip39Seed(num=12)
+    {
+        let arrLength = 16
+
+        var randArr = new Uint8Array(arrLength) 
+        window.crypto.getRandomValues(randArr)
+
+        var privateKeyBytes = []
+        for (var i = 0; i < randArr.length; ++i)
+            privateKeyBytes[i] = randArr[i]
+
+        //TEST CASE
+        //privateKeyBytes = [204, 40, 66, 180, 148, 159, 102, 152, 155, 222, 4, 35, 24, 42, 224, 14]
+        //
+
+        console.log(privateKeyBytes)
+
+        let checksumLength = arrLength * Keys.BITS_IN_BYTE / Keys.LENGTH_MULTIPLE
+
+        let fullBinStr = ""
+        for(let b of privateKeyBytes)
+        {
+            let binStr = Keys.CreateBinaryString(b).split(" ")[3];
+            fullBinStr += binStr
+        }
+
+        let sha256Result = Keys.SHA256HexToByteArray(Keys.BytesToHex(privateKeyBytes))
+
+        let sha256Bytes = Keys.HexToBytes(sha256Result)
+
+        let firstByte = Keys.CreateBinaryString(sha256Bytes[0]).split(" ")[3];
+
+        let checksum = firstByte.substr(0, firstByte.length-checksumLength)
+        
+        console.log(checksum)
+
+        let fullBinStrWithChecksum = fullBinStr + checksum
+
+        let squashedArr = [];
+        let tempStr = "";
+        for(let i = 0; i < fullBinStrWithChecksum.length; i++)
+        {
+            tempStr += fullBinStrWithChecksum[i];
+            if ((i+1) % 11 == 0)
+            {
+                squashedArr.push(tempStr)
+                tempStr=""
+            }
+        }
+
+        let words = [];
+        for(let i = 0; i < squashedArr.length; i++)
+        {
+            let idx = (Keys.BinaryToDecimal(squashedArr[i]))
+            let word = BIP39_WORDS[idx]
+            words.push(word)
+        }
+        
+        return words
     }
 }
