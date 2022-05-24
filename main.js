@@ -17,5 +17,5 @@ console.log(segwit)
 let bech32 = Keys.CompressedPrivateKeyToBech32Address(compr);
 console.log(bech32)
 
-let seed = Keys.GenerateRandomBip39Seed()
+let seed = Keys.GenerateRandomBip39Seed(21)
 console.log(seed)

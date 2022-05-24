@@ -479,13 +479,35 @@ static Base58DecodeToHex(
         return bech32Address
     }
 
-    static GenerateRandomBip39Seed(is256Bit = false)
+    static GenerateRandomBip39Seed(wordCount = 12)
     {
         let arrLength;
-        if (is256Bit)
-            arrLength = 32
-        else
-            arrLength = 16
+
+        switch(wordCount)
+        {
+            case 12:
+                arrLength = 16;
+                break;
+            
+            case 15:
+                arrLength = 20;
+                break;
+
+            case 18:
+                arrLength = 24;
+                break;
+
+            case 21:
+                arrLength = 28;
+                break;
+
+            case 24:
+                arrLength = 32;
+                break;
+
+            default:
+                throw Error("Invalid word count");
+        }
 
         var randArr = new Uint8Array(arrLength) 
         window.crypto.getRandomValues(randArr)
@@ -542,5 +564,10 @@ static Base58DecodeToHex(
         }
         
         return words
+    }
+
+    static VerifyBip39Seed(words)
+    {
+
     }
 }
