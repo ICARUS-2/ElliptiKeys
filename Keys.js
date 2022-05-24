@@ -9,6 +9,7 @@ export default class Keys
     static BECH32_CHARS = "qpzry9x8gf2tvdw0s3jn54khce6mua7l"
     static BITS_IN_BYTE = 8;
     static LENGTH_MULTIPLE = 32;
+    static BIP39_BITSPLIT = 11;
 
     static SHA256HexToByteArray(a)
     {
@@ -194,6 +195,21 @@ static Base58DecodeToHex(
         let bitcoinPrivateKey = Keys.Base58Encode(keyWithChecksum)
 
         return bitcoinPrivateKey;
+    }
+
+    static _ComputeBip39Checksum(privateKeyBytes)
+    {
+        let checksumLength = privateKeyBytes.length * Keys.BITS_IN_BYTE / Keys.LENGTH_MULTIPLE
+
+        let sha256Result = Keys.SHA256HexToByteArray(Keys.BytesToHex(privateKeyBytes))
+
+        let sha256Bytes = Keys.HexToBytes(sha256Result)
+
+        let firstByte = Keys.CreateBinaryString(sha256Bytes[0]).split(" ")[3];
+
+        let checksum = firstByte.substr(0, checksumLength)
+
+        return checksum
     }
 
     //kimbatt bitcoin generator bech32 library
@@ -517,12 +533,10 @@ static Base58DecodeToHex(
             privateKeyBytes[i] = randArr[i]
 
         //TEST CASE
-        //privateKeyBytes = [204, 40, 66, 180, 148, 159, 102, 152, 155, 222, 4, 35, 24, 42, 224, 14]
+        privateKeyBytes = [204, 40, 66, 180, 148, 159, 102, 152, 155, 222, 4, 35, 24, 42, 224, 14]
         //
 
         console.log(privateKeyBytes)
-
-        let checksumLength = arrLength * Keys.BITS_IN_BYTE / Keys.LENGTH_MULTIPLE
 
         let fullBinStr = ""
         for(let b of privateKeyBytes)
@@ -531,13 +545,7 @@ static Base58DecodeToHex(
             fullBinStr += binStr
         }
 
-        let sha256Result = Keys.SHA256HexToByteArray(Keys.BytesToHex(privateKeyBytes))
-
-        let sha256Bytes = Keys.HexToBytes(sha256Result)
-
-        let firstByte = Keys.CreateBinaryString(sha256Bytes[0]).split(" ")[3];
-
-        let checksum = firstByte.substr(0, checksumLength)
+        let checksum = Keys._ComputeBip39Checksum(privateKeyBytes)
         
         console.log(checksum)
 
@@ -548,7 +556,7 @@ static Base58DecodeToHex(
         for(let i = 0; i < fullBinStrWithChecksum.length; i++)
         {
             tempStr += fullBinStrWithChecksum[i];
-            if ((i+1) % 11 == 0)
+            if ((i+1) % Keys.BIP39_BITSPLIT == 0)
             {
                 squashedArr.push(tempStr)
                 tempStr=""
@@ -568,6 +576,81 @@ static Base58DecodeToHex(
 
     static VerifyBip39Seed(words)
     {
+        let bitCount;
 
+        switch(words.length)
+        {
+            case 12:
+                bitCount = 128;
+                break;
+
+            case 15: 
+                bitCount = 160;
+                break;
+
+            case 18:
+                bitCount = 192;
+                break;
+
+            case 21:
+                bitCount = 224;
+                break;
+
+            case 24:
+                bitCount = 256;
+                break;
+
+            default:
+                return false;
+        }
+
+        let checksumLength = bitCount / Keys.LENGTH_MULTIPLE
+
+        let indexes = []
+
+        for(let i = 0; i < words.length; i++)
+        {
+            let w = words[i];
+            for(let i = 0; i < BIP39_WORDS.length; i++)
+            {
+                if (w == BIP39_WORDS[i])
+                {
+                    indexes.push(i)
+                }
+            }
+        }
+
+        if (indexes.length != words.length)
+            return false;
+
+        let fullBinStrWithChecksum = "";
+        let splitWithSpaceIndex = Keys.BIP39_BITSPLIT + 1; 
+        for(let idx of indexes)
+        {
+            let binary = (Keys.CreateBinaryString(idx));
+            let lastElevenBits = binary.substring(binary.length-splitWithSpaceIndex, binary.length).replace(" ", "")
+            
+            fullBinStrWithChecksum += lastElevenBits
+        }
+
+        let receivedChecksum = fullBinStrWithChecksum.substring(fullBinStrWithChecksum.length-checksumLength, fullBinStrWithChecksum.length)
+    
+        let fullBinStr = fullBinStrWithChecksum.substring(0, fullBinStrWithChecksum.length-checksumLength)
+
+        let privateKeyBytes = [];
+        let tempStr = "";
+        for(let i = 0; i < fullBinStr.length; i++)
+        {
+            tempStr += fullBinStrWithChecksum[i];
+            if ((i+1) % Keys.BITS_IN_BYTE == 0)
+            {
+                privateKeyBytes.push(Keys.BinaryToDecimal(tempStr))
+                tempStr=""
+            }
+        }
+
+        let verifiedChecksum = Keys._ComputeBip39Checksum(privateKeyBytes)
+        
+        return verifiedChecksum == receivedChecksum
     }
 }
