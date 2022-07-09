@@ -1,7 +1,7 @@
 import Keys from './Keys.js';
 
-let compr = Keys.GenerateRandomCompressedPrivateKey();
-//let compr = 'KzMVzFdD4UDzRiXpGUtmM9HDh8RefUR4ZrQk53Qh6USTs7kDxxFS'
+//let compr = Keys.GenerateRandomCompressedPrivateKey();
+let compr = 'KzMVzFdD4UDzRiXpGUtmM9HDh8RefUR4ZrQk53Qh6USTs7kDxxFS'
 let decomp = Keys.DecompressWIF(compr)
 console.log(compr)
 
@@ -24,3 +24,5 @@ let isValid = Keys.VerifyBip39Mnemonic(mnemonic);
 console.log(isValid)
 
 Keys.GetSeedFromMnemonic(mnemonic)
+
+console.log(Keys.ValidateBitcoinAddress(bech32))

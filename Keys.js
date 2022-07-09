@@ -168,6 +168,11 @@ static Base58DecodeToHex(
         return Keys.BECH32_CHARS[byte];
     }
 
+    static _UnmapBech32Char(char)
+    {
+        return Keys.BECH32_CHARS.indexOf(char, 0)
+    }
+
     static _FormatHexStringLength(s)
     {
         if (s.length == Keys.HEX_LENGTH)
@@ -485,14 +490,67 @@ static Base58DecodeToHex(
         let checksum = Keys.BytesToHex(Keys.Bech32CreateChecksum("bc", bytes))
 
         let finalKey = Keys.HexToBytes(formattedKey + checksum);
-        
+
         let bech32Address = "bc1";
+
         for(let c of finalKey)
         {
             bech32Address += Keys._MapBech32Char(c);
         }
 
         return bech32Address
+    }
+
+    static ValidateBitcoinAddress(bitcoinAddress)
+    {
+        try
+        {
+            if (bitcoinAddress.startsWith('1') || bitcoinAddress.startsWith('3'))
+            {
+                let decoded = Keys.Base58DecodeToHex(bitcoinAddress)
+                
+                let providedChecksum = decoded.substr(decoded.length - 8, decoded.length)
+
+                let decodedWithoutChecksum = decoded.split(providedChecksum)[0]
+                console.log(decodedWithoutChecksum)
+                console.log(providedChecksum)
+
+                let computedChecksum = Keys.SHA256HexToByteArray(Keys.SHA256HexToByteArray(decodedWithoutChecksum)).substr(0,8)
+
+                console.log(computedChecksum)
+
+                return computedChecksum == providedChecksum
+            }
+
+            if (bitcoinAddress.startsWith("bc1q"))
+            {
+                bitcoinAddress = bitcoinAddress.replace("bc1", "")
+
+                let indexArr = []
+                for(let c of bitcoinAddress)
+                {
+                    indexArr.push(Keys._UnmapBech32Char(c))
+                }
+
+                const CHECKSUM_LENGTH = 6;
+
+                let bytesArr = new Uint8Array(indexArr)
+
+                let bytesWithoutChecksum = bytesArr.slice(0, bytesArr.length-CHECKSUM_LENGTH)
+
+                let providedChecksum = Keys.BytesToHex(bytesArr.slice(bytesArr.length - CHECKSUM_LENGTH, bytesArr.length))
+                
+                let computedChecksum = Keys.BytesToHex(Keys.Bech32CreateChecksum("bc", bytesWithoutChecksum))
+
+                return providedChecksum == computedChecksum;
+            }
+        }
+        catch(err)
+        {
+            console.log(err)
+            //If any exception occurs it cannot be valid, return false on next line
+        }
+        return false
     }
 
     static GenerateRandomBip39Mnemonic(wordCount = 12)
@@ -664,9 +722,14 @@ static Base58DecodeToHex(
             if (i != words.length - 1)
                 concat += " "
         }
-        console.log(concat)
-        let seed = CryptoJS.PBKDF2(concat, "mnemonic", {keySize: 64, iterations: 2048, hasher: CryptoJS.algo.SHA512})
+        //console.log(concat)
+        let seed = CryptoJS.PBKDF2(concat, "mnemonic", {keySize: 16, iterations: 2048, hasher: CryptoJS.algo.SHA512}).toString()
 
-        console.log(seed.toString())
+        let master = CryptoJS.HmacSHA512(CryptoJS.enc.Hex.parse(seed), "Bitcoin seed")
+        //todo figure this master shit out
+        //console.log("512-BIT SEED   "+ seed.toString())
+        //console.log("Master key: " + master)
+    
+        //CryptoJS.enc.Hex.parse(a)
     }
 }
