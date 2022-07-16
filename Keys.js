@@ -293,7 +293,7 @@ static Base58DecodeToHex(
     {
         let num = BigInt(numStr)
 
-        let privateKeyHex = Keys._FormatHexStringLength(BnToHex(num))
+        let privateKeyHex = Keys._FormatHexStringLength(Keys.BnToHex(num))
         let privateKeyHexAndPrefix = "80" + privateKeyHex;
 
         return Keys._PrivateKeyAndVersionToBitcoinKey(privateKeyHexAndPrefix);
@@ -303,7 +303,7 @@ static Base58DecodeToHex(
     {
         let num = BigInt(numStr)
 
-        let privateKeyHex = _FormatHexStringLength(BnToHex(num))
+        let privateKeyHex = Keys._FormatHexStringLength(Keys.BnToHex(num))
         let privateKeyHexAndPrefix = "80" + privateKeyHex + "01";
 
         return Keys._PrivateKeyAndVersionToBitcoinKey(privateKeyHexAndPrefix);
@@ -551,6 +551,71 @@ static Base58DecodeToHex(
             //If any exception occurs it cannot be valid, return false on next line
         }
         return false
+    }
+
+    static GenerateRandomTestnetPrivateKey()
+    {
+        var randArr = new Uint8Array(32) 
+        window.crypto.getRandomValues(randArr)
+
+        var privateKeyBytes = []
+        for (var i = 0; i < randArr.length; ++i)
+            privateKeyBytes[i] = randArr[i]
+
+        var privateKeyHex = Keys.BytesToHex(privateKeyBytes).toUpperCase()
+
+        var privateKeyAndVersion = "EF" + privateKeyHex
+
+        return Keys._PrivateKeyAndVersionToBitcoinKey(privateKeyAndVersion);
+    }
+
+    static GenerateRandomCompressedTestnetPrivateKey()
+    {
+        let randomKey = Keys.GenerateRandomTestnetPrivateKey();
+        let compressed = Keys.CompressTestnetWIF(randomKey);
+
+        return compressed
+    }
+
+    static GenerateTestnetPrivateKeyFromNumber(numStr)
+    {
+        let num = BigInt(numStr)
+
+        let privateKeyHex = Keys._FormatHexStringLength(Keys.BnToHex(num))
+        let privateKeyHexAndPrefix = "EF" + privateKeyHex;
+
+        return Keys._PrivateKeyAndVersionToBitcoinKey(privateKeyHexAndPrefix);
+    }
+
+    static GenerateCompressedTestnetPrivateKeyFromNumber(numStr)
+    {
+        let num = BigInt(numStr)
+
+        let privateKeyHex = Keys._FormatHexStringLength(Keys.BnToHex(num))
+        let privateKeyHexAndPrefix = "EF" + privateKeyHex + "01";
+
+        return Keys._PrivateKeyAndVersionToBitcoinKey(privateKeyHexAndPrefix);
+    }
+
+    static CompressTestnetWIF(key)
+    {
+        if (key.startsWith('c'))
+            return key;
+
+        let formattedHex = Keys._GetHexFromPrivateKey(key)
+        let k = "EF" + formattedHex + "01"
+        return Keys._PrivateKeyAndVersionToBitcoinKey(k)
+    }
+
+    static DecompressTestnetWIF(compressedKey)
+    {
+        if (compressedKey.startsWith('9'))
+            return compressedKey
+
+        let formattedHex = Keys._GetHexFromPrivateKey(compressedKey);
+        formattedHex = formattedHex.substr(0, formattedHex.length -2)
+        let k = "EF" + formattedHex;
+        return Keys._PrivateKeyAndVersionToBitcoinKey(k);
     }
 
     static GenerateRandomBip39Mnemonic(wordCount = 12)

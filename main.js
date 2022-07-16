@@ -26,3 +26,12 @@ console.log(isValid)
 Keys.GetSeedFromMnemonic(mnemonic)
 
 console.log(Keys.ValidateBitcoinAddress(bech32))
+
+let tDecomp = Keys.GenerateRandomTestnetPrivateKey();
+console.log(tDecomp)
+
+let tComp = Keys.CompressTestnetWIF(tDecomp)
+console.log(tComp)
+
+let tKeyFromNum = Keys.GenerateCompressedTestnetPrivateKeyFromNumber("1")
+console.log(tKeyFromNum)
