@@ -505,19 +505,15 @@ static Base58DecodeToHex(
     {
         try
         {
-            if (bitcoinAddress.startsWith('1') || bitcoinAddress.startsWith('3'))
+            if (bitcoinAddress.startsWith('1') || bitcoinAddress.startsWith('3') || bitcoinAddress.startsWith('2'))
             {
                 let decoded = Keys.Base58DecodeToHex(bitcoinAddress)
                 
                 let providedChecksum = decoded.substr(decoded.length - 8, decoded.length)
 
                 let decodedWithoutChecksum = decoded.split(providedChecksum)[0]
-                console.log(decodedWithoutChecksum)
-                console.log(providedChecksum)
 
                 let computedChecksum = Keys.SHA256HexToByteArray(Keys.SHA256HexToByteArray(decodedWithoutChecksum)).substr(0,8)
-
-                console.log(computedChecksum)
 
                 return computedChecksum == providedChecksum
             }
@@ -616,6 +612,96 @@ static Base58DecodeToHex(
         formattedHex = formattedHex.substr(0, formattedHex.length -2)
         let k = "EF" + formattedHex;
         return Keys._PrivateKeyAndVersionToBitcoinKey(k);
+    }
+
+    static TestnetPrivateKeyToLegacyAddress(privateKey)
+    {
+        let formattedHex = Keys._GetHexFromPrivateKey(privateKey);
+
+        let point = Point.fromPrivateKey(formattedHex);
+        let xHex = Keys.BnToHex(point.x);
+        let yHex = Keys.BnToHex(point.y);
+
+        let concat = "04"+xHex+yHex;
+        let sha256Result = Keys.SHA256HexToByteArray(concat);
+        let ripemd160Result = Keys.RIPEMD160HexToByteArray(sha256Result)
+        
+        let publicKeyWithVersion = "6F" + ripemd160Result;
+
+        let checksum = Keys.SHA256HexToByteArray(Keys.SHA256HexToByteArray(publicKeyWithVersion)).substr(0,8)
+
+        let publicKeyWithChecksum = publicKeyWithVersion + checksum
+        return (Keys.Base58Encode(publicKeyWithChecksum))
+    }
+
+    static TestnetCompressedPrivateKeyToLegacyAddress(key)
+    {
+        if (!key.startsWith('c'))
+            throw new Error("Only compressed keys are supported");
+
+        let formattedHex = Keys._GetHexFromPrivateKey(key)
+        formattedHex = formattedHex.substr(0, formattedHex.length - 2)
+
+        let point = Point.fromPrivateKey(formattedHex);
+        let xHex = Keys.BnToHex(point.x);
+        let yHex = Keys.BnToHex(point.y);
+
+        if (point.y % BigInt('2') == BigInt('0'))
+        {
+            xHex = "02" + xHex;
+        }
+        else
+        {
+            xHex = "03" + xHex
+        }
+
+        let sha256Result = Keys.SHA256HexToByteArray(xHex);
+        let ripemd160Result = Keys.RIPEMD160HexToByteArray(sha256Result);
+
+        let publicKeyWithVersion = "6F" + ripemd160Result;
+
+        let checksum = Keys.SHA256HexToByteArray(Keys.SHA256HexToByteArray(publicKeyWithVersion)).substr(0,8)
+    
+        let publicKeyWithChecksum = publicKeyWithVersion + checksum;
+
+        return (Keys.Base58Encode(publicKeyWithChecksum));
+    }
+
+    static TestnetCompressedPrivateKeyToSegwitAddress(key)
+    {
+        if (!key.startsWith('c'))
+            throw new Error("Only compressed keys are supported");
+
+        let formattedHex = Keys._GetHexFromPrivateKey(key)
+        formattedHex = formattedHex.substr(0, formattedHex.length - 2)
+
+        let point = Point.fromPrivateKey(formattedHex);
+        let xHex = Keys.BnToHex(point.x);
+
+        if (point.y % BigInt('2') == BigInt('0'))
+        {
+            xHex = "02" + xHex;
+        }
+        else
+        {
+            xHex = "03" + xHex
+        }
+
+        let sha256Result = Keys.SHA256HexToByteArray(xHex);
+        let keyHash = Keys.RIPEMD160HexToByteArray(sha256Result);
+
+        let p2w_v0 = Keys.HexToBytes("0014"+keyHash);
+
+        let scriptHash = Keys.RIPEMD160HexToByteArray(Keys.SHA256HexToByteArray(Keys.BytesToHex(p2w_v0)))
+
+        //let p2sh = HexToBytes("a9"+ scriptHash + '87')
+        let flaggedScripthash = Keys.HexToBytes("c4"+scriptHash);
+
+        let checksum = Keys.SHA256HexToByteArray(Keys.SHA256HexToByteArray(Keys.BytesToHex(flaggedScripthash))).substr(0,8)
+
+        let binAddr = Keys.BytesToHex(flaggedScripthash)+checksum;
+
+        return Keys.Base58Encode(binAddr)
     }
 
     static GenerateRandomBip39Mnemonic(wordCount = 12)
@@ -778,6 +864,7 @@ static Base58DecodeToHex(
 
     static GetSeedFromMnemonic(words)
     {
+        throw new Error("Not implemented")
         let concat ="";
 
         for(let i = 0; i < words.length; i++)
