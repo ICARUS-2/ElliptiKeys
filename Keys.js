@@ -155,10 +155,16 @@ static Base58DecodeToHex(
 
     static _GetHexFromPrivateKey(key)
     {
+        //Must decode key to its hex form
         let decoded = Keys.Base58DecodeToHex(key)
+
+        //Removes the checksum
         let hexWithoutChecksum = decoded.substr(0, decoded.length-8)
+        
+        //Removes the version number
         let hexWithoutPrefix = hexWithoutChecksum.substr(2, hexWithoutChecksum.length-1)
 
+        //Adds the necessary trailing zeroes to the hex
         let formattedHex = Keys._FormatHexStringLength(hexWithoutPrefix)
         return formattedHex;
     }
@@ -178,6 +184,7 @@ static Base58DecodeToHex(
         if (s.length == Keys.HEX_LENGTH)
             return s
 
+        //Adds trailing zeroes to the hex to ensure its length
         let trailingZeroes = '';
         let diff = Keys.HEX_LENGTH - s.length;
 
@@ -191,12 +198,15 @@ static Base58DecodeToHex(
 
     static _PrivateKeyAndVersionToBitcoinKey(privateKeyAndVersion)
     {
+        //Compute the checksum by double-SHA256, take first 8 chars (4 bytes)
         var firstSHA = Keys.SHA256HexToByteArray(privateKeyAndVersion)
         var secondSHA = Keys.SHA256HexToByteArray(firstSHA)
         var checksum = secondSHA.substr(0, 8).toUpperCase()
 
+        //Combines the two to make the key
         var keyWithChecksum = privateKeyAndVersion + checksum
 
+        //Base 58 encode gives us the final address
         let bitcoinPrivateKey = Keys.Base58Encode(keyWithChecksum)
 
         return bitcoinPrivateKey;
@@ -204,6 +214,7 @@ static Base58DecodeToHex(
 
     static _ComputeBip39Checksum(privateKeyBytes)
     {
+        //Checksum length depends on how long the seed is
         let checksumLength = privateKeyBytes.length * Keys.BITS_IN_BYTE / Keys.LENGTH_MULTIPLE
 
         let sha256Result = Keys.SHA256HexToByteArray(Keys.BytesToHex(privateKeyBytes))
@@ -212,6 +223,7 @@ static Base58DecodeToHex(
 
         let firstByte = Keys.CreateBinaryString(sha256Bytes[0]).split(" ")[3];
 
+        //Checksum is gotten by verifying the first byte's characters
         let checksum = firstByte.substr(0, checksumLength)
 
         return checksum
@@ -267,22 +279,28 @@ static Base58DecodeToHex(
 
     static GenerateRandomPrivateKey()
     {
+        //Securely gets the random bytes
         var randArr = new Uint8Array(32) 
         window.crypto.getRandomValues(randArr)
 
+        //Converts it to a normal array for compatibility
         var privateKeyBytes = []
         for (var i = 0; i < randArr.length; ++i)
             privateKeyBytes[i] = randArr[i]
 
+        //Converts the random bytes to a hex string
         var privateKeyHex = Keys.BytesToHex(privateKeyBytes).toUpperCase()
 
+        //Bitcoin mainnet version is 80
         var privateKeyAndVersion = "80" + privateKeyHex
 
+        //Will compute the checksum and perform encoding
         return Keys._PrivateKeyAndVersionToBitcoinKey(privateKeyAndVersion);
     }
 
     static GenerateRandomCompressedPrivateKey()
     {
+        //Simply generates an uncompressed key and runs it through the compress function
         let randomKey = Keys.GenerateRandomPrivateKey();
         let compressed = Keys.CompressWIF(randomKey)
         
@@ -339,32 +357,40 @@ static Base58DecodeToHex(
 
     static PrivateKeyToLegacyAddress(privateKey)
     {
+        //We need the hex to derive the ECC public key
         let formattedHex = Keys._GetHexFromPrivateKey(privateKey);
 
+        //Point on the elliptic curve
         let point = Point.fromPrivateKey(formattedHex);
         let xHex = Keys.BnToHex(point.x);
         let yHex = Keys.BnToHex(point.y);
 
+        //Concatenate 04 plus the points to make our formatted key
         let concat = "04"+xHex+yHex;
         let sha256Result = Keys.SHA256HexToByteArray(concat);
         let ripemd160Result = Keys.RIPEMD160HexToByteArray(sha256Result)
         
+        //P2PKH is a hash of the public key, mainnet is 00
         let publicKeyWithVersion = "00" + ripemd160Result;
 
+        //Checksum is the first 8 chars of the double-hashed key
         let checksum = Keys.SHA256HexToByteArray(Keys.SHA256HexToByteArray(publicKeyWithVersion)).substr(0,8)
 
+        //Append checksum and return our address
         let publicKeyWithChecksum = publicKeyWithVersion + checksum
         return (Keys.Base58Encode(publicKeyWithChecksum))
     }
 
     static CompressedPrivateKeyToLegacyAddress(key)
     {
+        //Compressed private key only starts with K or L
         if (!key.startsWith('K') && !key.startsWith('L'))
             throw new Error("Only compressed keys are supported");
 
         let formattedHex = Keys._GetHexFromPrivateKey(key)
         formattedHex = formattedHex.substr(0, formattedHex.length - 2)
 
+        //Compressed key does not require Y since it is compressed
         let point = Point.fromPrivateKey(formattedHex);
         let xHex = Keys.BnToHex(point.x);
         let yHex = Keys.BnToHex(point.y);
@@ -413,6 +439,7 @@ static Base58DecodeToHex(
         let sha256Result = Keys.SHA256HexToByteArray(xHex);
         let keyHash = Keys.RIPEMD160HexToByteArray(sha256Result);
 
+        //Generates the script hash by appending the marker and double-hashing
         let p2w_v0 = Keys.HexToBytes("0014"+keyHash);
 
         let scriptHash = Keys.RIPEMD160HexToByteArray(Keys.SHA256HexToByteArray(Keys.BytesToHex(p2w_v0)))
@@ -429,6 +456,7 @@ static Base58DecodeToHex(
 
     static CompressedPrivateKeyToBech32Address(key)
     {
+        //Perform the same steps as we did with segwit
         if (!key.startsWith('K') && !key.startsWith('L'))
             throw new Error("Only compressed keys are supported");
 
@@ -455,17 +483,20 @@ static Base58DecodeToHex(
         
         let binArr = []
 
+        //Get the entire key hash in the form of a binary string, always 4 bits
         for (let c of toChar)
         {
             binArr.push(Keys.HexToBinaryString(c, 4))
         }
 
+        //Concatenate all the binary into one strng
         let fullBinStr = "";
         for (let c of binArr)
         {
             fullBinStr += c
         }
 
+        //Changes the spacing from intervals of 4 to intervals of 5 for bech32 encoding
         let squashedArr = [];
         let tempStr = "";
         for(let i = 0; i < fullBinStr.length; i++)
@@ -478,19 +509,23 @@ static Base58DecodeToHex(
             }
         }
 
+        //Convert the binary to hex and append version number
         let formattedKey = "";
         for(let c of squashedArr)
         {
             formattedKey +=Keys.BinaryToHex(c).result.toLowerCase()
         }
+
         formattedKey = "00" + formattedKey
 
+        //Create and append the checksum
         let bytes = Keys.HexToBytes(formattedKey);
 
         let checksum = Keys.BytesToHex(Keys.Bech32CreateChecksum("bc", bytes))
 
         let finalKey = Keys.HexToBytes(formattedKey + checksum);
 
+        //Create HRP and map the characters
         let bech32Address = "bc1";
 
         for(let c of finalKey)
@@ -503,6 +538,7 @@ static Base58DecodeToHex(
 
     static ValidateBitcoinAddress(bitcoinAddress)
     {
+        //Legacy/Wrapped SegWit will require verifying the double-hash checksum
         try
         {
             if (bitcoinAddress.startsWith('1') || bitcoinAddress.startsWith('3') || bitcoinAddress.startsWith('2'))
@@ -518,6 +554,7 @@ static Base58DecodeToHex(
                 return computedChecksum == providedChecksum
             }
 
+            //Bech32 encoding requires its own type of checksum
             if (bitcoinAddress.startsWith("bc1q"))
             {
                 bitcoinAddress = bitcoinAddress.replace("bc1", "")
@@ -702,6 +739,88 @@ static Base58DecodeToHex(
         let binAddr = Keys.BytesToHex(flaggedScripthash)+checksum;
 
         return Keys.Base58Encode(binAddr)
+    }
+
+    static TestnetCompressedPrivateKeyToBech32Address(key)
+    {
+        //Perform the same steps as we did with segwit
+        if (!key.startsWith('c'))
+            throw new Error("Only compressed keys are supported");
+
+        let formattedHex = Keys._GetHexFromPrivateKey(key)
+        formattedHex = formattedHex.substr(0, formattedHex.length - 2)
+
+        let point = Point.fromPrivateKey(formattedHex);
+        let xHex = Keys.BnToHex(point.x);
+
+        if (point.y % BigInt('2') == BigInt('0'))
+        {
+            xHex = "02" + xHex;
+        }
+        else
+        {
+            xHex = "03" + xHex
+        }
+
+        let sha256Result = Keys.SHA256HexToByteArray(xHex);
+        let keyhash = Keys.RIPEMD160HexToByteArray(sha256Result);
+
+        //keyhash = "751e76e8199196d454941c45d1b3a323f1433bd6"
+        let toChar = Object.assign([], keyhash)
+        
+        let binArr = []
+
+        //Get the entire key hash in the form of a binary string, always 4 bits
+        for (let c of toChar)
+        {
+            binArr.push(Keys.HexToBinaryString(c, 4))
+        }
+
+        //Concatenate all the binary into one strng
+        let fullBinStr = "";
+        for (let c of binArr)
+        {
+            fullBinStr += c
+        }
+
+        //Changes the spacing from intervals of 4 to intervals of 5 for bech32 encoding
+        let squashedArr = [];
+        let tempStr = "";
+        for(let i = 0; i < fullBinStr.length; i++)
+        {
+            tempStr += fullBinStr[i];
+            if ((i+1) % 5 == 0)
+            {
+                squashedArr.push(tempStr)
+                tempStr=""
+            }
+        }
+
+        //Convert the binary to hex and append version number
+        let formattedKey = "";
+        for(let c of squashedArr)
+        {
+            formattedKey +=Keys.BinaryToHex(c).result.toLowerCase()
+        }
+
+        formattedKey = "00" + formattedKey
+
+        //Create and append the checksum
+        let bytes = Keys.HexToBytes(formattedKey);
+
+        let checksum = Keys.BytesToHex(Keys.Bech32CreateChecksum("tb", bytes))
+
+        let finalKey = Keys.HexToBytes(formattedKey + checksum);
+
+        //Create HRP and map the characters
+        let bech32Address = "tb1";
+
+        for(let c of finalKey)
+        {
+            bech32Address += Keys._MapBech32Char(c);
+        }
+
+        return bech32Address
     }
 
     static GenerateRandomBip39Mnemonic(wordCount = 12)

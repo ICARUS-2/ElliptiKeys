@@ -42,3 +42,6 @@ console.log("Testnet Compressed Legacy "+tLegacy)
 
 let tSegwit = Keys.TestnetCompressedPrivateKeyToSegwitAddress(tComp)
 console.log("Testnet Compressed Segwit "+tSegwit)
+
+let tBech32 = Keys.TestnetCompressedPrivateKeyToBech32Address(tComp)
+console.log(tBech32)
