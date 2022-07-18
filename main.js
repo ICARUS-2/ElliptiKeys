@@ -45,5 +45,3 @@ console.log("Testnet Compressed Segwit "+tSegwit)
 
 let tBech32 = Keys.TestnetCompressedPrivateKeyToBech32Address(tComp)
 console.log(tBech32)
-
-console.log("VALID " + Keys.ValidateBitcoinAddress(tSegwit))
