@@ -1,7 +1,7 @@
 import Keys from './Keys.js';
 
-//let compr = Keys.GenerateRandomCompressedPrivateKey();
-let compr = 'KzMVzFdD4UDzRiXpGUtmM9HDh8RefUR4ZrQk53Qh6USTs7kDxxFS'
+let compr = Keys.GenerateRandomCompressedPrivateKey();
+//let compr = 'KzMVzFdD4UDzRiXpGUtmM9HDh8RefUR4ZrQk53Qh6USTs7kDxxFS'
 let decomp = Keys.DecompressWIF(compr)
 console.log(compr)
 
@@ -27,8 +27,8 @@ console.log(isValid)
 
 console.log(Keys.ValidateBitcoinAddress(bech32))
 
-//let tDecomp = Keys.GenerateRandomTestnetPrivateKey();
-let tDecomp = "93CYCpB2diaXxnUJKFwmYL21tpwMk3ZNLchFFaqMotFEXZGMuZX"
+let tDecomp = Keys.GenerateRandomTestnetPrivateKey();
+//let tDecomp = "93CYCpB2diaXxnUJKFwmYL21tpwMk3ZNLchFFaqMotFEXZGMuZX"
 console.log(tDecomp)
 
 let tComp = Keys.CompressTestnetWIF(tDecomp)
